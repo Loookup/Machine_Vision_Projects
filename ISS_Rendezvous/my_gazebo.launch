@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<launch>
+
+  <arg name="model" value="$(find r2000_description)/urdf/my_r2000.urdf"/>
+  <arg name="paused" default="false"/>
+  <arg name="gazebo_gui" default="true"/>
+  <arg name="use_sim_time" default="true"/>
+  <arg name="initial_joint_positions" doc="Initial joint configuration of the robot"
+       default=" -J joint_1 0 -J joint_2 0 -J joint_3 0 -J joint_4 0 -J joint_5 0 -J joint_6 0 -J joint_1_2 0 -J joint_2_2 0 -J joint_3_2 0 -J joint_4_2 0 -J joint_5_2 0"/>
+  <arg name="gui" default="true"/>
+  <arg name="headless" default="false"/>
+  <arg name="debug" default="false"/>
+
+  <!-- startup simulated world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" default="worlds/empty.world"/>
+    <arg name="gui" value="$(arg gui)" />
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    <arg name="headless" value="$(arg headless)"/>
+  </include>
+  <param name="use_gui" value="$(arg gui)"/>
+
+  <group ns="/r2000_description">
+    <!-- send robot urdf to param server -->
+    <param name="robot_description" textfile="$(find r2000_description)/urdf/my_r2000.urdf" />
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" ></node>
+
+    <arg name="depth_topic" default="/camera1/depth/image_raw" />
+
+    <!-- unpause only after loading robot model -->
+    <arg name="unpause" value="$(eval '' if arg('paused') else '-unpause')" />
+    <!-- push robot_description to factory and spawn robot in gazebo at the origin, change x,y,z arguments to spawn in a different position -->
+    <arg name="world_pose" value="-x 0 -y 0 -z 0" />
+    <node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model" args="-urdf -param robot_description -model robot $(arg unpause) $(arg world_pose) $(arg initial_joint_positions)"
+      respawn="false" output="screen" />
+
+    <!-- Load joint controller parameters for Gazebo -->
+    <rosparam file="$(find fanuc_r2000ic_moveit_config)/config/my_gazebo_controllers.yaml" />
+    <!-- Spawn Gazebo ROS controllers -->
+    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" 
+      output="screen" ns="/r2000_description" args="--namespace=/r2000_description
+      joint_state_controller
+      joint_1_pc
+      joint_2_pc
+      joint_3_pc
+      joint_4_pc
+      joint_5_pc
+      joint_6_pc
+      joint_1_2_pc
+      joint_2_2_pc
+      joint_3_2_pc
+      joint_4_2_pc
+      joint_5_2_pc
+      joint_6_2_vc
+      --timeout 0"/>
+  </group>
+</launch>
